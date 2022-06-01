@@ -1,0 +1,38 @@
+pums_all <- read_csv("pums_all.csv")
+  
+# Use "expand_grid" to fill in missing hisp/race/ST/year combinations
+pums_all <-
+  expand_grid(hisp = unique(pums_all$hisp),
+              race = unique(pums_all$race),
+              ST = unique(pums_all$ST),
+              year = unique(pums_all$year)) %>%
+  left_join(pums_all) %>%
+  mutate(n = if_else(is.na(n), 0, n)) %>%
+  group_by(ST, hisp, race) %>%
+  mutate(n_prev = lag(n, order_by = year),
+         abs_growth = n - n_prev,
+         rel_growth = abs_growth / n_prev)
+
+library("gganimate")
+
+plain <- function(x,...) {
+  format(x, ..., scientific = FALSE, drop0trailing = TRUE)
+}
+
+animated_plot <-  
+  ggplot(pums_all %>% filter(year != 2010), 
+         aes(abs(abs_growth), 
+             abs(rel_growth),
+             size = n, 
+             color = factor(ST))) +
+  theme_bw() +
+  geom_point(alpha = 0.7, show.legend = FALSE) +
+  scale_size(range = c(2, 12)) +
+  scale_x_log10(labels = plain) +
+  scale_y_log10(labels = plain) +
+  facet_grid(race ~ hisp) +
+  labs(title = 'Year: {round(frame_time, 0)}', x = 'absolute growth', y = 'relative growth') +
+  transition_time(year) + 
+  ease_aes('linear')
+
+animated_plot
